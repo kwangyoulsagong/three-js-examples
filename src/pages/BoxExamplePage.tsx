@@ -1,5 +1,7 @@
+import { CheckingRerenderGuiHelperBoxExample } from "../features/BoxExample/CheckingRerenderGuiHelperBoxExample";
 import { SingleBoxExample } from "../features/BoxExample/DefaultBoxExample";
 import { MultiBoxExample } from "../features/BoxExample/MultiBoxExample";
+import { PreventUnnecessaryRerenderBoxExample } from "../features/BoxExample/PreventUnnecessaryRerenderBoxExample";
 
 const BoxExamplePage = () => {
   return (
@@ -19,6 +21,8 @@ const BoxExamplePage = () => {
       <main className="flex flex-1 flex-col items-center justify-center p-10 gap-4">
         <SingleBoxExample />
         <MultiBoxExample />
+        <PreventUnnecessaryRerenderBoxExample />
+        <CheckingRerenderGuiHelperBoxExample />
       </main>
     </section>
   );
