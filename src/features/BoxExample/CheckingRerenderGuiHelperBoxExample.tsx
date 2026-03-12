@@ -65,29 +65,255 @@ requestAnimationFrame(animate);
 };`;
 
 const fullCode = `// full demo code here (example)
-const scene = new Scene();
+export const CheckingRerenderGuiHelperBoxExample = () => {
+  const boxRenderContainerRef = useRef<HTMLDivElement>(null);
+  const cameraRef = useRef<PerspectiveCamera | null>(null);
+  const sceneRef = useRef<Scene | null>(null);
+  const rendererRef = useRef<WebGLRenderer | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
+  const cubesRef = useRef<Mesh[]>([]);
+  const guiRef = useRef<GUI | null>(null);
 
-const camera = new PerspectiveCamera(
-75,
-width / height,
-0.1,
-5
-);
+  const [open, setOpen] = useState(false);
 
-const renderer = new WebGLRenderer();
+  const fieldOfView = 75;
+  const near = 0.1;
+  const far = 5;
 
-function animate(time){
-time *= 0.001;
+  const boxWidth = 1;
+  const boxHeight = 1;
+  const boxDepth = 1;
 
-cube.rotation.x = time;
-cube.rotation.y = time;
+  const lightColor = 0xffffff;
+  const intensity = 3;
 
-renderer.render(scene,camera);
+  let renderRequested = false;
 
-requestAnimationFrame(animate);
-}
+  const requestRenderIfNotRequested = () => {
+    if (!renderRequested) {
+      renderRequested = true;
 
-animate();
+      requestAnimationFrame(() => {
+        renderRequested = false;
+
+        const renderer = rendererRef.current!;
+        const scene = sceneRef.current!;
+        const camera = cameraRef.current!;
+        const controls = controlsRef.current!;
+
+        resizeRendererToDisplaySize();
+        controls.update();
+        renderer.render(scene, camera);
+      });
+    }
+  };
+
+  const initContainer = () => {
+    if (!boxRenderContainerRef.current) return;
+    const container = boxRenderContainerRef.current;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    return { width, height, container };
+  };
+
+  const initCamera = ({ width, height }: { width: number; height: number }) => {
+    const camera = new PerspectiveCamera(
+      fieldOfView,
+      width / height,
+      near,
+      far,
+    );
+
+    camera.position.z = 2;
+    cameraRef.current = camera;
+  };
+
+  const initScene = (light: DirectionalLight) => {
+    const scene = new Scene();
+    scene.add(light);
+    sceneRef.current = scene;
+  };
+
+  const makeCubeInstance = ({ geometry, color, x }: MakeCubeInstanceType) => {
+    const scene = sceneRef.current!;
+    const gui = guiRef.current!;
+
+    const material = new MeshPhongMaterial({ color });
+
+    const cube = new Mesh(geometry, material);
+
+    cube.position.x = x;
+
+    const folder = gui.addFolder('Cube ' + x);
+
+    folder
+      .addColor(new ColorGUIHelper(material, "color"), "value")
+      .name("color")
+      .onChange(requestRenderIfNotRequested);
+
+    folder
+      .add(cube.scale, "x", 0.1, 1.5)
+      .name("scaleX")
+      .onChange(requestRenderIfNotRequested);
+
+    folder.open();
+
+    scene.add(cube);
+
+    return cube;
+  };
+
+  useEffect(() => {
+    const gui = new GUI();
+    guiRef.current = gui;
+
+    return () => gui.destroy();
+  }, []);
+
+  const initRenderer = ({
+    width,
+    height,
+  }: {
+    width: number;
+    height: number;
+  }) => {
+    const renderer = new WebGLRenderer({ antialias: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(window.devicePixelRatio);
+
+    rendererRef.current = renderer;
+
+    return renderer;
+  };
+
+  const initControls = () => {
+    if (!cameraRef.current || !rendererRef.current) return;
+    const camera = cameraRef.current;
+    const canvas = rendererRef.current.domElement;
+
+    const controls = new OrbitControls(camera, canvas);
+    controls.update();
+    controls.enableDamping = true;
+
+    controls.addEventListener("change", requestRenderIfNotRequested);
+
+    controlsRef.current = controls;
+  };
+
+  const resizeRendererToDisplaySize = () => {
+    if (
+      !boxRenderContainerRef.current ||
+      !cameraRef.current ||
+      !rendererRef.current
+    )
+      return;
+
+    const container = boxRenderContainerRef.current;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    const renderer = rendererRef.current;
+    const canvas = renderer.domElement;
+    const camera = cameraRef.current;
+
+    const needSize = canvas.width !== width || canvas.height !== height;
+
+    if (needSize) {
+      renderer.setSize(width, height);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    }
+  };
+  useEffect(() => {
+    const containerValue = initContainer();
+    if (!containerValue) return;
+    const { width, height, container } = containerValue;
+
+    initCamera({ width, height });
+
+    const geometry = new BoxGeometry(boxWidth, boxHeight, boxDepth);
+
+    const light = new DirectionalLight(lightColor, intensity);
+    light.position.set(-1, 2, 4);
+
+    initScene(light);
+    const cubes = [
+      makeCubeInstance({ geometry, color: 0x44aa88, x: 0 }),
+      makeCubeInstance({ geometry, color: 0x8844aa, x: -2 }),
+      makeCubeInstance({ geometry, color: 0xaa8844, x: 2 }),
+    ];
+
+    cubesRef.current = cubes;
+
+    const renderer = initRenderer({ width, height });
+    if (!renderer) return;
+    initControls();
+    container.appendChild(renderer.domElement);
+
+    return () => {
+      cubes.forEach((cube) => {
+        cube?.geometry.dispose();
+        (cube?.material as MeshPhongMaterial).dispose();
+      });
+      renderer.dispose();
+      if (container.contains(renderer.domElement))
+        container.removeChild(renderer.domElement);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (
+      !rendererRef.current ||
+      !sceneRef.current ||
+      !cameraRef.current ||
+      !controlsRef.current
+    )
+      return;
+
+    const renderer = rendererRef.current;
+    const scene = sceneRef.current;
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+
+    let rafId: number;
+
+    const animate = (time: number = 0) => {
+      time *= 0.001;
+
+      cubesRef.current.forEach((cube, idx) => {
+        const speed = 1 + idx * 0.1;
+        const rotate = time * speed;
+
+        cube.rotation.x = rotate;
+        cube.rotation.y = rotate;
+      });
+
+      resizeRendererToDisplaySize();
+      controls.update();
+      renderer.render(scene, camera);
+
+      rafId = requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    return () => cancelAnimationFrame(rafId);
+  }, []);
+  return (
+    <div className="flex h-[600px] max-w-[1200px] w-full bg-white rounded-xl overflow-hidden shadow-google">
+      <div className="flex-1 border-r border-neutral-200">
+        <div ref={boxRenderContainerRef} className="h-full w-full" />
+      </div>
+
+      {/* 설명 */}
+      <div className="w-[420px]">
+        <Explanation onOpen={() => setOpen(true)} />
+      </div>
+
+      <CodeModal open={open} onClose={() => setOpen(false)} />
+    </div>
+  );
+};
 `;
 
 /* ------------------------------ Code Block ------------------------------ */
