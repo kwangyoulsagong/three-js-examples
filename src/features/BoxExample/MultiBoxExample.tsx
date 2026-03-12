@@ -67,6 +67,28 @@ export const MultiBoxExample = () => {
     return cube;
   };
 
+  const resizeRendererToDisplaySize = () => {
+    if (
+      !rendererRef.current ||
+      !boxRenderContainerRef.current ||
+      !cameraRef.current
+    ) {
+      return;
+    }
+    const container = boxRenderContainerRef.current;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    const renderer = rendererRef.current;
+    const canvas = renderer.domElement;
+    const camera = cameraRef.current;
+    const needResize = canvas.width !== width || canvas.height !== height;
+    if (needResize) {
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    }
+  };
+
   useEffect(() => {
     if (!boxRenderContainerRef.current) return;
 
@@ -109,7 +131,8 @@ export const MultiBoxExample = () => {
      * Renderer 생성
      * WebGL을 이용하여 Scene을 화면에 렌더링
      */
-    const renderer = new WebGLRenderer();
+    const renderer = new WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(width, height);
 
     /**
@@ -120,15 +143,21 @@ export const MultiBoxExample = () => {
     rendererRef.current = renderer;
 
     return () => {
+      cubesRef.current.forEach((cube) => {
+        cube.geometry.dispose();
+        (cube.material as MeshPhongMaterial).dispose();
+      });
+
       renderer.dispose();
-      if (container.contains(renderer.domElement))
+
+      if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
+      }
     };
   }, []);
 
   useEffect(() => {
     if (
-      !boxRenderContainerRef.current ||
       !sceneRef.current ||
       !cameraRef.current ||
       !rendererRef.current ||
@@ -136,7 +165,6 @@ export const MultiBoxExample = () => {
     )
       return;
 
-    const container = boxRenderContainerRef.current;
     const scene = sceneRef.current;
     const camera = cameraRef.current;
     const renderer = rendererRef.current;
@@ -144,11 +172,6 @@ export const MultiBoxExample = () => {
 
     let rafId: number;
     const animate = (time: number = 1) => {
-      const width = container.clientWidth;
-      const height = container.clientHeight;
-
-      const canvas = renderer.domElement;
-
       time *= 0.001;
 
       cubes.forEach((cube, idx) => {
@@ -158,11 +181,7 @@ export const MultiBoxExample = () => {
         cube.rotation.y = rotate;
       });
 
-      if (canvas.width !== width || canvas.height !== height) {
-        renderer.setSize(width, height);
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
-      }
+      resizeRendererToDisplaySize();
 
       renderer.render(scene, camera);
       rafId = requestAnimationFrame(animate);
